@@ -8,7 +8,9 @@ import sqlalchemy as sa
 import bcrypt
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token, JWTManager, current_user
 from flask_migrate import Migrate
-
+import hashlib
+import os
+from werkzeug.datastructures import  FileStorage
 NAME_IS_REQUIRED = "NAME_IS_REQUIRED"
 PASSWORD_IS_REQUIRED = "PASSWORD_IS_REQUIRED"
 USER_ALREADY_EXIST = "USER_ALREADY_EXIST"
@@ -18,6 +20,7 @@ PASSWORD_IS_WRONG = "PASSWORD_IS_WRONG"
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://postgres:postgres@192.168.50.145:5432/xb2_node"
 app.secret_key = "hello flask"
+app.config["UPLOAD_FOLDER"] = 'upload'
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 migrate = Migrate(app, db)
@@ -207,6 +210,60 @@ def login():
         "access_token": access_token
     }
 
+
+def save_file(file: FileStorage) -> (str, int):
+    # 计算文件的 MD5
+    data = file.read()
+    md5 = hashlib.md5(data).hexdigest()
+
+    data_len = len(data)
+    # 使用 MD5 作为文件名
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], md5)
+
+    if os.path.exists(filepath):
+        return md5, data_len
+
+    with open(filepath, 'wb') as f:
+        f.write(data)
+
+    return md5, data_len
+
+@app.post("/files")
+@jwt_required()
+def create_file():
+    # check post id 
+    post_id = int(request.args.get("post"))
+    if post_id is None:
+        raise Exception("POST_NOT_FOUND")
+    
+    if current_user.own_post(post_id):
+        pass
+    else:
+        raise Exception("USER_DOES_NOT_OWN_RESOURCE")
+    
+    file = request.files.get("file")
+    if file is None:
+        raise Exception("FILE_NOT_FOUND")
+
+    md5, file_len = save_file(file)
+
+    file_row = File(
+        originalname = file.filename,
+        mimetype = file.mimetype,
+        filename =md5,
+        size = file_len,
+        postId = post_id,
+        userId = current_user.id
+    )
+
+    db.session.add(file_row)
+    db.session.commit()
+
+    return {
+        "msg": file_row.id
+    }
+
+
 @app.cli.command(help="create tables")
 @click.option("--drop", is_flag=True, help='create after drop')
 def initdb(drop):
@@ -238,6 +295,9 @@ def handle_exception(e: Exception):
         case "POST_NOT_FOUND":
             status_code = 400
             message = 'POST_NOT_FOUND'
+        case "FILE_NOT_FOUND":
+            status_code = 400
+            message = 'FILE_NOT_FOUND'
         case "USER_DOES_NOT_OWN_RESOURCE":
             status_code = 400
             message = "USER_DOES_NOT_OWN_RESOURCE"
