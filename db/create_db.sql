@@ -1,0 +1,1 @@
+CREATE DATABASE xb2_node;

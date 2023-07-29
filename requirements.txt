@@ -1,0 +1,9 @@
+flask
+loguru
+python-dotenv
+Flask-SQLAlchemy
+sqlalchemy
+bcrypt
+psycopg2-binary
+flask-jwt-extended[asymmetric_crypto]
+Flask-Migrate

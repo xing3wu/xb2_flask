@@ -1,0 +1,1 @@
+UPDATE post SET content = '一道残阳铺水中, 半江瑟瑟半江红' WHERE id = 3;
