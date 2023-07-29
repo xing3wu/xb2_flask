@@ -58,6 +58,16 @@ class Post(db.Model):
     user = db.relationship('User', back_populates='posts')
 
 
+class File(db.Model):
+    id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    originalname = sa.Column(sa.String(255), nullable=False)
+    mimetype = sa.Column(sa.String(255), nullable=False)
+    filename = sa.Column(sa.String(255), nullable=False)
+    size = sa.Column(sa.Integer, nullable=False)
+    postId = sa.Column(sa.Integer, sa.ForeignKey('post.id'))
+    userId = sa.Column(sa.Integer, sa.ForeignKey('user.id'))
+
+
 @app.post("/posts")
 @jwt_required()
 def post_index():
