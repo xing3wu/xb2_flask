@@ -28,9 +28,13 @@ class User(db.Model):
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)
     password = sa.Column(sa.String(255), nullable=False)
-
+    posts = db.relationship('Post', back_populates='user')
+    
     def check_password(self, password: str):
         return bcrypt.checkpw(password.encode('utf-8'), self.password.encode('utf-8'))
+
+    def own_post(self, post_id: int):
+        return any(p.id == post_id for p in self.posts)
 
 
 @jwt.user_identity_loader
@@ -51,6 +55,7 @@ class Post(db.Model):
     title = sa.Column(sa.String(255), nullable=False)
     content = sa.Column(sa.Text)
     userId = sa.Column(sa.Integer, sa.ForeignKey('user.id'))
+    user = db.relationship('User', back_populates='posts')
 
 
 @app.post("/posts")
@@ -70,8 +75,9 @@ def post_index():
 
 
 @app.get("/posts")
+@jwt_required()
 def post_all():
-    posts: list["Post"] = db.session.execute(db.select(Post)).scalars()
+    posts: list["Post"] = current_user.posts
     return [
         {
             "id": post.id,
@@ -83,8 +89,9 @@ def post_all():
 
 
 @app.get("/posts/<int:post_id>")
+@jwt_required()
 def post_one(post_id: int):
-    post: Post = db.session.execute(db.select(Post).filter_by(id=post_id)).scalar_one()
+    post: Post = Post.query.get(post_id)
     return {
         "id": post.id,
         "title": post.title,
@@ -93,8 +100,17 @@ def post_one(post_id: int):
 
 
 @app.delete("/posts/<int:post_id>")
+@jwt_required()
 def post_del(post_id: int):
-    post: Post = db.session.execute(db.select(Post).filter_by(id=post_id)).scalar_one()
+    post: Post = Post.query.get(post_id)
+    if post is None:
+        raise Exception("POST_NOT_FOUND")
+
+    if current_user.own_post(post.id):
+        pass
+    else:
+        raise Exception("USER_DOES_NOT_OWN_RESOURCE")
+
     db.session.delete(post)
     db.session.commit()
     return {
@@ -103,12 +119,23 @@ def post_del(post_id: int):
 
 
 @app.patch("/posts/<int:post_id>")
+@jwt_required()
 def post_update(post_id: int):
-    post: Post = db.session.execute(db.select(Post).filter_by(id=post_id)).scalar_one()
+    post: Post = Post.query.get(post_id)
+    if post is None:
+        raise Exception("POST_NOT_FOUND")
+
+    if current_user.own_post(post.id):
+        pass
+    else:
+        raise Exception("USER_DOES_NOT_OWN_RESOURCE")
+
     if request.json.get("title", None):
         post.title = request.json["title"]
     if request.json.get("content", None):
         post.content = request.json["content"]
+
+
     db.session.commit()
     return {
         "id": post.id,
@@ -170,8 +197,7 @@ def login():
         "access_token": access_token
     }
 
-
-@app.cli.command()
+@app.cli.command(help="create tables")
 @click.option("--drop", is_flag=True, help='create after drop')
 def initdb(drop):
     if drop:
@@ -199,6 +225,12 @@ def handle_exception(e: Exception):
         case "PASSWORD_IS_WRONG":
             status_code = 400
             message = 'PASSWORD_IS_WRONG'
+        case "POST_NOT_FOUND":
+            status_code = 400
+            message = 'POST_NOT_FOUND'
+        case "USER_DOES_NOT_OWN_RESOURCE":
+            status_code = 400
+            message = "USER_DOES_NOT_OWN_RESOURCE"
         case _:
             status_code = 500
             message = "服务暂时出了点问题"
