@@ -1,5 +1,5 @@
 import click
-from flask import Flask, jsonify, request, g, current_app
+from flask import Flask, jsonify, request, g, current_app, send_from_directory, send_file
 from loguru import logger
 from flask_sqlalchemy import SQLAlchemy
 import traceback
@@ -262,6 +262,18 @@ def create_file():
     return {
         "msg": file_row.id
     }
+
+
+@app.get("/files/<int:fileId>/serve")
+def get_file(fileId: int):
+    file: File = File.query.get(fileId)
+    if file is None:
+        raise Exception('FILE_NOT_FOUND')
+    
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+
+    return send_file(file_path, mimetype=file.mimetype)
+    
 
 
 @app.cli.command(help="create tables")
