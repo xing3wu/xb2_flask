@@ -6,11 +6,15 @@ import traceback
 from typing import cast
 import sqlalchemy as sa
 import bcrypt
+import json
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token, JWTManager, current_user
 from flask_migrate import Migrate
 import hashlib
 import os
+from datetime import datetime, timedelta
 from werkzeug.datastructures import  FileStorage
+from PIL import Image, ExifTags
+
 NAME_IS_REQUIRED = "NAME_IS_REQUIRED"
 PASSWORD_IS_REQUIRED = "PASSWORD_IS_REQUIRED"
 USER_ALREADY_EXIST = "USER_ALREADY_EXIST"
@@ -207,29 +211,67 @@ def login():
     else:
         raise Exception(PASSWORD_IS_WRONG)
 
-    access_token = create_access_token(identity=user)
+    access_token = create_access_token(identity=user, expires_delta=timedelta(days=1))
     return {
         "id": user.id,
         "access_token": access_token
     }
 
 
-def save_file(file: FileStorage) -> (str, int):
-    # 计算文件的 MD5
-    data = file.read()
-    md5 = hashlib.md5(data).hexdigest()
+def save_file(file: FileStorage) -> File:
+    with Image.open(file) as img:
+        img_bytes = img.tobytes()
+        md5 = hashlib.md5(img_bytes).hexdigest()
 
-    data_len = len(data)
-    # 使用 MD5 作为文件名
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], md5)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], md5)
 
-    if os.path.exists(filepath):
-        return md5, data_len
+        img = Image.open(file)
+        img_size = len(img_bytes)
+        img_exif = img.getexif()
+        metadata = {}
+        if img_exif is not None:
+            for key, val in img_exif.items():
+                if key in ExifTags.TAGS and isinstance(val, (str, int, float)):
+                    metadata[ExifTags.TAGS[key]] = val
 
-    with open(filepath, 'wb') as f:
-        f.write(data)
 
-    return md5, data_len
+        width, height = img.size
+
+        img.save(filepath, format="PNG")
+
+        resize_dir = os.path.join(app.config['UPLOAD_FOLDER'], "resize")
+        os.makedirs(resize_dir, exist_ok=True)
+
+        if width > 1280:
+            width_percent = 1280 / float(img.width)
+            
+            new_height = int((float(img.height) * float(width_percent)))
+            large_img_path = os.path.join(resize_dir, f"{md5}-large")
+            img.resize((1280, new_height)).save(large_img_path, format="PNG")
+
+        if width > 640:
+            width_percent = 640 / float(img.width)
+            
+            new_height = int((float(img.height) * float(width_percent)))
+            large_img_path = os.path.join(resize_dir, f"{md5}-medium")
+            img.resize((640, new_height)).save(large_img_path, format="PNG")
+
+        if width > 320:
+            width_percent = 320 / float(img.width)
+            
+            new_height = int((float(img.height) * float(width_percent)))
+            large_img_path = os.path.join(resize_dir, f"{md5}-thumbnail")
+            img.resize((320, new_height)).save(large_img_path, format="PNG")
+
+        return  File(
+            originalname = file.filename,
+            mimetype = file.mimetype,
+            filename = md5,
+            size = img_size,
+            width = width,
+            height = height,
+            metadata_ = metadata
+        )
 
 @app.post("/files")
 @jwt_required()
@@ -248,16 +290,10 @@ def create_file():
     if file is None:
         raise Exception("FILE_NOT_FOUND")
 
-    md5, file_len = save_file(file)
+    file_row = save_file(file)
 
-    file_row = File(
-        originalname = file.filename,
-        mimetype = file.mimetype,
-        filename =md5,
-        size = file_len,
-        postId = post_id,
-        userId = current_user.id
-    )
+    file_row.userId = current_user.id
+    file_row.postId = post_id
 
     db.session.add(file_row)
     db.session.commit()
@@ -273,11 +309,39 @@ def get_file(fileId: int):
     if file is None:
         raise Exception('FILE_NOT_FOUND')
     
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    size = request.args.get("size")
+
+    match size:
+        case None:
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        case "large":
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'],'resize', f"{file.filename}-large")
+        case "medium":
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'],'resize', f"{file.filename}-medium")
+        case "thumbnail":
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'],'resize', f"{file.filename}-thumbnail")
+        case _:
+            raise Exception('FILE_NOT_FOUND')
+    
+    if not os.path.exists(file_path):
+        raise Exception('FILE_NOT_FOUND')
 
     return send_file(file_path, mimetype=file.mimetype)
     
 
+@app.get("/files/<int:fileId>/metadata")
+def get_file_meta(fileId: int):
+    file: File = File.query.get(fileId)
+    if file is None:
+        raise Exception('FILE_NOT_FOUND')
+    
+    return {
+        "id": fileId,
+        "size": file.size,
+        "width": file.width,
+        "height": file.height,
+        "metadata": file.metadata_
+    }
 
 @app.cli.command(help="create tables")
 @click.option("--drop", is_flag=True, help='create after drop')
