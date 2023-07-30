@@ -67,6 +67,9 @@ class File(db.Model):
     mimetype = sa.Column(sa.String(255), nullable=False)
     filename = sa.Column(sa.String(255), nullable=False)
     size = sa.Column(sa.Integer, nullable=False)
+    width = sa.Column(sa.Integer,nullable=False)
+    height = sa.Column(sa.Integer, nullable=False)
+    metadata_ = sa.Column("metadata", sa.JSON, nullable=True)
     postId = sa.Column(sa.Integer, sa.ForeignKey('post.id'))
     userId = sa.Column(sa.Integer, sa.ForeignKey('user.id'))
 
