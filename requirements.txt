@@ -8,3 +8,4 @@ psycopg2-binary
 flask-jwt-extended[asymmetric_crypto]
 Flask-Migrate
 Pillow
+Faker
