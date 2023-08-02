@@ -9,7 +9,7 @@ from xb2.extensions import db
 user_bp = Blueprint('user', __name__)
 
 @user_bp.post("/users")
-def create_user():
+def create_one():
     if request.json.get("name") is None:
         raise Exception("NAME_IS_REQUIRED")
     if request.json.get("password") is None:

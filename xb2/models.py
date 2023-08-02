@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean, DateTime, JSON
 from sqlalchemy.orm import relationship
 from xb2.extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -29,3 +29,15 @@ class Post(db.Model):
     content = Column(Text)
     userId = Column(Integer, ForeignKey('user.id'))
     user = db.relationship('User', back_populates='posts')
+
+class File(db.Model):
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    originalname = Column(String(255), nullable=False)
+    mimetype = Column(String(255), nullable=False)
+    filename = Column(String(255), nullable=False)
+    size = Column(Integer, nullable=False)
+    width = Column(Integer,nullable=True)
+    height = Column(Integer, nullable=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
+    postId = Column(Integer, ForeignKey('post.id'))
+    userId = Column(Integer, ForeignKey('user.id'))
