@@ -25,7 +25,6 @@ def create_app(config_name: str) -> "Flask":
 def register_extensions(app: Flask) -> None:
     db.init_app(app)
     jwt.init_app(app)
-
     migrate.init_app(app, db)
 
 @profile

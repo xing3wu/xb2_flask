@@ -41,3 +41,7 @@ class File(db.Model):
     metadata_ = Column("metadata", JSON, nullable=True)
     postId = Column(Integer, ForeignKey('post.id'))
     userId = Column(Integer, ForeignKey('user.id'))
+
+class Tag(db.Model):
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, unique=True)
