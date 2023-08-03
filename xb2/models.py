@@ -54,4 +54,11 @@ class Tag(db.Model):
     name = Column(String(255), nullable=False, unique=True)
     posts = db.relationship('Post', secondary=post_tag_table, back_populates='tags')
 
+class Comment(db.Model):
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    content = Column(Text)
+    postId = Column(Integer, ForeignKey('post.id'), nullable=False)
+    userId = Column(Integer, ForeignKey('user.id'), nullable=False)
+    parentId = Column(Integer, ForeignKey('tag.id'), nullable=True, default=None)
+
 
