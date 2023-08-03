@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, current_user
 from xb2.extensions import db
-from xb2.models import Post
+from xb2.models import Post, Tag
 
 post_bp = Blueprint('post', __name__)
 
@@ -85,4 +85,60 @@ def post_update(post_id: int):
         "id": post.id,
         "title": post.title,
         "content": post.content
+    }
+
+# get all tags for a post
+@post_bp.get("/posts/<int:post_id>/tag")
+def get_all_tag(post_id: int):
+    post: Post = Post.query.get(post_id)
+    return {
+        "id": post.id,
+        "tags": [
+            tag.name
+            for tag in post.tags
+        ]
+    }
+
+# add a tag for a post
+@post_bp.post("/posts/<int:post_id>/tag")
+def create_tag(post_id: int):
+    post: Post = Post.query.get(post_id)
+    if post is None:
+        raise Exception("POST_NOT_FOUND")
+
+    tag_name = request.json.get("name")
+    if tag_name is None:
+        raise Exception("TAG_NAME_NOT_FOUND")
+    
+    tag: Tag = Tag.query.filter_by(name=tag_name).one_or_none()
+    if tag is None:
+        tag = Tag(name=tag_name)
+        db.session.add(tag)
+        db.session.commit()
+    
+    post.tags.append(tag)
+    db.session.commit()
+    return {
+        "id": post.id,
+    }
+
+# delete a tag for a post
+@post_bp.delete("/posts/<int:post_id>/tag")
+def delete_tag(post_id: int):
+    post: Post = Post.query.get(post_id)
+    if post is None:
+        raise Exception("POST_NOT_FOUND")
+
+    tag_name = request.json.get("name")
+    if tag_name is None:
+        raise Exception("TAG_NAME_NOT_FOUND")
+    
+    tag: Tag = Tag.query.filter_by(name=tag_name).one_or_none()
+    if tag is None:
+        raise Exception("TAG_NOT_FOUND")
+    
+    post.tags.remove(tag)
+    db.session.commit()
+    return {
+        "id": post.id,
     }
