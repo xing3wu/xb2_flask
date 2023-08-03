@@ -3,6 +3,10 @@ from sqlalchemy.orm import relationship
 from xb2.extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
+
+post_tag_table = db.Table('post_tag', Column('postId', Integer, ForeignKey('post.id')), Column('tagId', Integer, ForeignKey('tag.id')))
+
+
 class User(db.Model):
     __tablename__ = 'user'
 
@@ -29,6 +33,9 @@ class Post(db.Model):
     content = Column(Text)
     userId = Column(Integer, ForeignKey('user.id'))
     user = db.relationship('User', back_populates='posts')
+    tags = db.relationship('Tag', secondary=post_tag_table, back_populates='posts')
+
+
 
 class File(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -45,3 +52,6 @@ class File(db.Model):
 class Tag(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False, unique=True)
+    posts = db.relationship('Post', secondary=post_tag_table, back_populates='tags')
+
+
