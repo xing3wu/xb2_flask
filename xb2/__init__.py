@@ -9,6 +9,7 @@ from xb2.views.file import file_bp
 from xb2.views.user import user_bp
 from xb2.views.post import post_bp
 from xb2.views.tag import tag_bp
+from xb2.views.comment import comment_bp
 from xb2.utils import profile
 
 @profile
@@ -79,6 +80,7 @@ def register_routes(app: Flask) -> None:
     app.register_blueprint(file_bp)
     app.register_blueprint(post_bp)
     app.register_blueprint(tag_bp)
+    app.register_blueprint(comment_bp)
 
 @profile
 def register_commands(app: Flask) -> None:
