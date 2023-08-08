@@ -62,3 +62,9 @@ class Comment(db.Model):
     parentId = Column(Integer, ForeignKey('tag.id'), nullable=True, default=None)
 
 
+class Avatar(db.Model):
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    mimetype = Column(String(255), nullable=False)
+    filename = Column(String(255), nullable=False)
+    size = Column(Integer, nullable=False)
+    userId = Column(Integer, ForeignKey('user.id'), nullable=False)
